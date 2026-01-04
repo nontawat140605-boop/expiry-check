@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>เช็ควันหมดอายุสินค้า</title>
+
+<style>
+:root {
+    --main: #5fb3a2;
+    --soft: #f3f7f6;
+    --danger: #e74c3c;
+    --warn: #f39c12;
+    --ok: #2ecc71;
+    --text: #333;
+}
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", sans-serif;
+    background: var(--soft);
+    color: var(--text);
+}
+
+header {
+    background: white;
+    padding: 20px;
+    text-align: center;
+    border-bottom: 2px solid #eee;
+}
+
+header h1 {
+    margin: 0;
+    color: var(--main);
+}
+
+header p {
+    margin: 5px 0 0;
+    font-size: 14px;
+    color: #777;
+}
+
+.container {
+    max-width: 900px;
+    margin: 20px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+}
+
+.form {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 10px;
+}
+
+input, button {
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    font-size: 15px;
+}
+
+button {
+    background: var(--main);
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+.alert {
+    background: #fff7e6;
+    border-left: 5px solid var(--warn);
+    padding: 12px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+th {
+    background: var(--soft);
+    padding: 10px;
+}
+
+td {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    text-align: center;
+}
+
+.badge {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 13px;
+    color: white;
+}
+
+.ok { background: var(--ok); }
+.warn { background: var(--warn); }
+.exp { background: var(--danger); }
+
+.delete {
+    background: var(--danger);
+    border: none;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.footer {
+    text-align: center;
+    margin-top: 30px;
+    color: #888;
+    font-size: 13px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>🧺 ร้านชำ น้องเมฆ</h1>
+    <p>ระบบเช็ควันหมดอายุสินค้า</p>
+</header>
+
+<div class="container">
+
+    <div id="alertBox"></div>
+
+    <div class="form">
+        <input id="name" placeholder="🥫 ชื่อสินค้า เช่น นม, บะหมี่">
+        <input type="date" id="expiry">
+        <button onclick="add()">➕ เพิ่มสินค้า</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>📦 สินค้า</th>
+                <th>📅 วันหมดอายุ</th>
+                <th>⏳ สถานะ</th>
+                <th>🗑️</th>
+            </tr>
+        </thead>
+        <tbody id="list"></tbody>
+    </table>
+
+</div>
+
+<div class="footer">
+    🥛🥚🍞🥬 ร้านชำน้องเมฆ ใช้งานง่าย สบายตา
+</div>
+
+<script>
+let products = JSON.parse(localStorage.getItem("products")) || [];
+
+if ("Notification" in window && Notification.permission !== "granted") {
+    Notification.requestPermission();
+}
+
+function diffDays(date) {
+    return Math.ceil((new Date(date) - new Date()) / 86400000);
+}
+
+function add() {
+    const name = nameEl.value;
+    const expiry = expiryEl.value;
+    if (!name || !expiry) return alert("กรอกข้อมูลให้ครบ");
+    products.push({name, expiry});
+    save();
+}
+
+function del(i) {
+    products.splice(i,1);
+    save();
+}
+
+function save() {
+    localStorage.setItem("products", JSON.stringify(products));
+    render();
+}
+
+function notify() {
+    if (Notification.permission !== "granted") return;
+    products.forEach(p=>{
+        const d = diffDays(p.expiry);
+        if (d === 0) new Notification("⚠ หมดอายุวันนี้", {body:p.name});
+        if (d === 3) new Notification("⏰ ใกล้หมดอายุ", {body:`${p.name} เหลือ 3 วัน`});
+    });
+}
+
+function render() {
+    list.innerHTML = "";
+    let warnList = [];
+
+    products.forEach((p,i)=>{
+        const d = diffDays(p.expiry);
+        let badge = d < 0 ? "exp" : d <= 7 ? "warn" : "ok";
+        let text = d < 0 ? "หมดอายุ" : d <= 7 ? "ใกล้หมด" : "ปกติ";
+
+        if (d <= 7) warnList.push(p.name);
+
+        list.innerHTML += `
+        <tr>
+            <td>${p.name}</td>
+            <td>${p.expiry}</td>
+            <td><span class="badge ${badge}">${text}</span></td>
+            <td><button class="delete" onclick="del(${i})">ลบ</button></td>
+        </tr>`;
+    });
+
+    alertBox.innerHTML = warnList.length
+        ? `<div class="alert">⚠ สินค้าที่ต้องตรวจสอบ: ${warnList.join(", ")}</div>`
+        : "";
+
+    notify();
+}
+
+const nameEl = document.getElementById("name");
+const expiryEl = document.getElementById("expiry");
+const list = document.getElementById("list");
+const alertBox = document.getElementById("alertBox");
+
+render();
+setInterval(notify, 3600000);
+</script>
+
+</body>
+</html>
